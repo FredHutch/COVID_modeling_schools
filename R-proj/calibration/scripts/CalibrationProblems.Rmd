@@ -1,0 +1,171 @@
+---
+title: "Histoire de mes problèmes de la calibration"
+author: "Chloe Bracis"
+date: "3/23/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# if you get an error "cannot open the connection", then change under
+# global options -> Markdown, the setting: "evaluate chunks in directory" to "Project"
+source("covid-model.R")
+source("kc_read_data.R")
+kc_data_init = filter(kc_data_calib, date <= ymd("2020-04-30"))
+
+```
+
+## Initial calibratin of version 2 of the model.
+
+This document tries to keep track of various things I have tried for the version 2 calibration.
+
+
+## L-BFGS-B
+
+Inital try was to use optim and L-BFGS-B (matching the calibration done in the version 1.5 vaccine branch). Initially just try to fit the first period of start of epidemic through April 30 2020. The parameters fit were bstar, first_inf_day, beta_d, the by age sd, deltaI, delta_notI, and h, giving 19 parameters total.
+
+*Problems:*
+The calibration terminated with the message "Line search cannot locate an adequate point after 20 function and gradient evaluations" and ERROR: ABNORMAL_TERMINATION_IN_LNSRCH. Searching on this error suggests a problem with the gradient (we do not pass a gradient function, thus L-BFGS-B uses a finite-difference approximation) or an objective function that is too flat, or possibly needing smaller tolerances in the ode solver vs. tolerances in the optimizer.
+
+A few times I got another error:
+
+Things I have tried:
+
+  * Removing different parameters, including first_inf_day which is integer-valued and the various deltas. However, even trying to fit just bstar and beta_d still had the smae problem
+  * Doing a grid search for each parameter individually to improve the initial conditions (library NMOF)
+  * Starting with the best parameterization found by the GA method, or subsets of this parameterization (optimizing fewer parameters)
+    - however, even with different initial conditions, the same error occurs
+    - unlike other reports with this error, the final solution doesn't seem to be a great fit, and in general the solution given in par is little changed from the initial conditions
+  * Change the objective function to take a 7-day moving average of the data
+  * Change the objective function to normalize by the mean rather than the variance of the data
+  * Change the objective function to not include negative tests
+  * Multiply the objective function by 100 incase the problem is that changes were too small
+
+Here are the 'best guess' from the grid search
+```{r grid_params, echo=TRUE}
+params_kc_guess = c(sd_1 = 0.7,
+                    sd_2 = 0.65,
+                    sd_3 = 0.6,
+                    sd_4 = 0.65,
+                    delta_I_1 = 0.025,   
+                    delta_I_2 = 0.001,   
+                    delta_I_3 = 0.1,   
+                    delta_I_4 = 0.1,   
+                    delta_notI_1 = 1e-4,
+                    delta_notI_2 = 5e-4,
+                    delta_notI_3 = 5e-4,
+                    delta_notI_4 = 8e-4,
+                    h_1 = 0.15,
+                    h_2 = 0.15,
+                    h_3 = 0.15,
+                    h_4 = 0.25
+)
+params_kc_guess_init = c(bstar = 0.028, 
+                         beta_d = 0.5, 
+                         first_inf_day = 5,
+                         params_kc_guess)
+
+```
+
+Here are some plots of those parameters. Not great!
+
+```{r grid_plot, echo=TRUE}
+plot_age_fit_from_params(params_kc_guess_init, names(params_kc_guess_init), params_base, NULL, state, "cases", kc_data_init)
+plot_age_fit_from_params(params_kc_guess_init, names(params_kc_guess_init), params_base, NULL, state, "hosp", kc_data_init)
+plot_age_fit_from_params(params_kc_guess_init, names(params_kc_guess_init), params_base, NULL, state, "deaths", kc_data_init)
+
+```
+
+## DEoptim
+
+With all the troubles with BFGS, I also tried to use a robust genetic algorithm good at real-valued problems, but that could be more forgiving of having an integer-valued parameter or perhaps not smooth gradient. However, I tried this three times, and each time my computer crashed after approx 10-15 hours. Here is the best solution found:
+
+```{r deoptim_params, echo=TRUE}
+params_deoptim = c(0.049225, 0.254653, 6.022471,
+                   0.851675, 0.796686, 0.847640, 0.740957,
+                   0.031610, 0.079224, 0.122433, 0.138288,
+                   0.000116, 0.000486, 0.000481, 0.000588,
+                   0.330915, 0.422413, 0.312559, 0.303233)
+```
+
+And the resulting plots, Also not great!
+
+```{r deoptim_plot, echo=FALSE}
+plot_age_fit_from_params(params_deoptim, names(params_kc_guess_init), params_base, NULL, state, "cases", kc_data_init)
+plot_age_fit_from_params(params_deoptim, names(params_kc_guess_init), params_base, NULL, state, "hosp", kc_data_init)
+plot_age_fit_from_params(params_deoptim, names(params_kc_guess_init), params_base, NULL, state, "deaths", kc_data_init)
+
+```
+
+In both cases, there seems to be a problem getting the epidemic to both start early enough and reach a peak and come back down soon enough too. I did some experimenting with starting as early as possible in January and with a larger bstar and still had these problems. Here is an investigation of how lambda has changed between v1 and v2.
+
+## lambda
+
+```{r lambda_calc, echo = FALSE}
+calc_lambda = function(version = c(1, 2), sd, bstar)
+{
+  if (version == 2)
+  {
+    kappa = c(.34, 1, 1, 1.45)
+    lambda = bstar * kappa * (params_base$C %*% (1 - rep(sd, 4)))
+  }
+  else if (version == 1)
+  {
+    contact =  t(as.matrix(read.csv("../data/contact_matrix.csv", header = FALSE)))  
+    lambda = bstar * contact %*% (1 - rep(sd, 4))
+  }
+  return(lambda)
+}
+
+sd = seq(0, 1, 0.1)
+bstar1_sm = sapply(sd, function(x)calc_lambda(1, x, 0.176))
+bstar1_md = sapply(sd, function(x)calc_lambda(1, x, 0.19))
+bstar1_lg = sapply(sd, function(x)calc_lambda(1, x, 0.2))
+
+bstar2_xsm = sapply(sd, function(x)calc_lambda(2, x, 0.01))
+bstar2_sm = sapply(sd, function(x)calc_lambda(2, x, 0.02))
+bstar2_md = sapply(sd, function(x)calc_lambda(2, x, 0.035))
+bstar2_lg = sapply(sd, function(x)calc_lambda(2, x, 0.05))
+
+```
+
+First the v1.5 lambda, notice that it is the same for all ages if we don't have different sd's
+
+```{r plot_lambda_1, echo = FALSE}
+matplot(sd, t(bstar1_sm), type = "l", xlab = "sd", ylab = "lambda", main = "bstar 0.176", ylim = c(0, 0.5))
+matplot(sd, t(bstar1_md), type = "l", xlab = "sd", ylab = "lambda", main = "bstar 0.19", ylim = c(0, 0.5))
+matplot(sd, t(bstar1_lg), type = "l", xlab = "sd", ylab = "lambda", main = "bstar 0.26", ylim = c(0, 0.5))
+```
+
+And now the v2 lambda, with the effect of the new contact matrix and kappa
+
+```{r plot_lambda_2, echo = FALSE}
+matplot(sd, t(bstar2_xsm), type = "l", xlab = "sd", ylab = "lambda", main = "bstar 0.01", ylim = c(0, 0.5))
+legend("topright", legend = paste("age", 1:4), lty = 1:4, col = 1:4, bty = "n")
+matplot(sd, t(bstar2_sm), type = "l", xlab = "sd", ylab = "lambda", main = "bstar 0.02", ylim = c(0, 0.5))
+matplot(sd, t(bstar2_md), type = "l", xlab = "sd", ylab = "lambda", main = "bstar 0.035", ylim = c(0, 0.5))
+matplot(sd, t(bstar2_lg), type = "l", xlab = "sd", ylab = "lambda", main = "bstar 0.05", ylim = c(0, 0.5))
+```
+
+## Try out the model
+
+And here's a plot where we can play around with some parameters.
+
+Current tentative hypotheses:
+  * seems hard to get the epidemic to start early enough without going way to big
+    - is this due to new lambda? (but age specific sd could counter balance this)
+    - or maybe since we ramp sd just weekly?
+    - the relationship between bstar and sd now seems more tipping point like
+  * or something else??
+  
+```{r guess_plot, echo = TRUE}
+# start with guess params then adjust from there...
+params_calib = get_params(params_kc_guess_init, names(params_kc_guess_init), params_base)
+plot_age_fit_from_params(c(0.04, 1, 0.7, 0.8, 0.8, 0.7), 
+                         c("bstar", "first_inf_day", "sd_1", "sd_2", "sd_3", "sd_4"), 
+                         params_calib, NULL, state, "cases", kc_data_init)
+```
+
+
+

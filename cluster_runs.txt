@@ -1,0 +1,55 @@
+This file describes how to run the various version 2 scenarios on the
+scientific computing platforms at Fred Hutch.
+
+In order to run on either the interactive (rhino) machines of the cluster (gizmo nodes), the following must be in place:
+
+1. Get a rhino account
+
+2. Clone the code from the GIT repository
+
+	ssh [username]@rhino
+	git clone https://github.com/FredHutch/COVID_modeling/
+
+3. Make sure you select which R version to load (ml command)
+
+	ex. ml R/3.6.2-foss-2019b-fh1
+
+4. Make sure the required R packages are installed either on the system or locally.
+
+5. CD to the desired run directory
+
+6.  Either launch R interactively or on the cluster
+
+    For running on rhino(01,02 or 03) mahcines...
+	run R directly or using "nohup" in background (so you can log off w/o it needing to finish)
+
+    For running on the cluster either use sbatch with a shell script that calls R or normally
+    after executing a "grabnode" command.  (Documentation for using both is available on-line).
+
+    
+Here are some examples...
+
+
+Interactive runs...
+
+    cd ~/version2/COVID_modeling/R-script
+    ml R/3.6.2-foss-2019b-fh1
+    R --vanilla < ../Vaccine\ Rollout/Run_Rollout.R
+
+	or
+
+    nohup R --vanilla < ../Vaccine\ Rollout/Run_Rollout.R > rollout.out &
+
+Batch run (for up to 24 hours)...
+
+    sbatch -n -t 24:00:00 ./run_rollout.sh
+
+where run_rollout.sh is the shell script shown here
+
+#!/bin/sh
+Rscript ../Vaccine\ Rollout/Run_Rollout.R
+
+Foreground "grabnode" job...
+
+Use grabnode command to request memory & cpus for some amount of time (must complete by the end of that period)
+then issue commands as if you are just on the rhinos.

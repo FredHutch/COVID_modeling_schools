@@ -1,0 +1,8 @@
+base
+plyr
+coda
+Matrix
+adaptMCMC
+lubridate
+stringr
+scales

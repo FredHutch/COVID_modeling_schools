@@ -1,0 +1,10 @@
+/var/tmp/slurmd/job36188494/slurm_script: 2: /var/tmp/slurmd/job36188494/slurm_script: source: not found
+/var/tmp/slurmd/job36188494/slurm_script: 3: /var/tmp/slurmd/job36188494/slurm_script: ml: not found
+mkdir: cannot create directory ‘data/’: File exists
+mkdir: cannot create directory ‘data//scenarios/’: File exists
+/var/tmp/slurmd/job36188494/slurm_script: 13: /var/tmp/slurmd/job36188494/slurm_script: Rscript: not found
+/var/tmp/slurmd/job36188494/slurm_script: 16: /var/tmp/slurmd/job36188494/slurm_script: Rscript: not found
+/var/tmp/slurmd/job36188494/slurm_script: 16: /var/tmp/slurmd/job36188494/slurm_script: Rscript: not found
+/var/tmp/slurmd/job36188494/slurm_script: 16: /var/tmp/slurmd/job36188494/slurm_script: Rscript: not found
+/var/tmp/slurmd/job36188494/slurm_script: 16: /var/tmp/slurmd/job36188494/slurm_script: Rscript: not found
+/var/tmp/slurmd/job36188494/slurm_script: 19: /var/tmp/slurmd/job36188494/slurm_script: Rscript: not found

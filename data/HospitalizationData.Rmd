@@ -1,0 +1,76 @@
+---
+title: "Hospitalization Data"
+output: rmarkdown::github_document
+---
+
+```{r setup, include=FALSE}
+# pull in prepared data
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(dplyr)
+library(ggplot2)
+
+```
+
+## CDC Hospitalization data
+
+Hospitalization Rates and Characteristics of Patients Hospitalized with Laboratory-Confirmed Coronavirus Disease 2019 — COVID-NET, 14 States, March 1–30, 2020
+
+Accessed from <https://www.cdc.gov/mmwr/volumes/69/wr/mm6915e3.htm?s_cid=mm6915e3_w> on April 17, 2020.
+
+"Among 167 patients with available data, the median interval from symptom onset to admission was 7 days."
+
+This paper is stored in the references directory as mm6915e3_H.pdf.
+
+The paper references data that has been published on the following site. <https://gis.cdc.gov/grasp/covidnet/COVID19_3.html>
+
+Currently, the script CDC_HospData.R compiles the downloaded data locally and stores a slim csv for plotting.
+ 
+```{r CDCplot, echo=FALSE}
+hospdata <- read.csv("../data/CDCHosp/hospdata.csv")
+
+CDCplot <- hospdata %>%
+  filter(CATCHMENT != "Entire Network") %>%
+  ggplot(aes(MMWR.WEEK, WEEKLY.RATE, col = AGE.CATEGORY)) + 
+  geom_line() + 
+  facet_wrap(~ CATCHMENT) + 
+  theme_minimal() +
+  ylab("Hospitalization per 100k residents") +
+  ggtitle("Cumulative hospitalizations")
+#  xlab("")
+#  scale_color_paletteer_d("awtools::a_palette")
+
+CDCplot
+```
+
+## IHME Hospitalization predictions
+
+IHME predictions were pulled on three separate dates in April: April 4, 9, and 12. 
+
+Currently, the script IHME_HospPreds.R compiles the data locally and stores a slim csv for plotting only the states available in the CDC data.
+
+```{r IHMEplot, echo=FALSE}
+IHMEplotdata <- read.csv("../data/IHMEProjections/IHMEplotdata.csv")
+
+CDCStates <- c("Utah", "Tennessee", "Oregon", "Ohio", "New York", "New Mexico", "Minnesota", "Michigan", "Maryland", "Iowa", "Georgia", "Connecticut", "Colorado", "California")
+
+IHMEplotdata <- IHMEplotdata %>%
+  filter(location_name %in% CDCStates,
+         doy < 120,
+         doy >= 70)
+
+IHMEtime <- ggplot(IHMEplotdata, aes(doy, HospRate, col = location_name)) + 
+  geom_line() + 
+  facet_wrap(~ dataseries) + 
+  theme_minimal() +
+  ylab("Hospitalization per 100k residents") 
+
+IHMEstate <- ggplot(IHMEplotdata, aes(doy, HospRate, col = factor(dataseries))) + 
+  geom_line() + 
+  facet_wrap(~ location_name) + 
+  theme_minimal() +
+  ylab("Hospitalization per 100k residents") +
+  ggtitle("Current beds required")
+
+IHMEstate
+```
+

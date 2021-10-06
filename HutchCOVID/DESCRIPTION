@@ -1,0 +1,14 @@
+Package: HutchCOVID
+Type: Package
+Title: Epidemiological model for COVID-19
+Version: 1.0
+Date: 2021-07-20
+Author: Who wrote it
+Maintainer: Chloe Bracis <chloe.bracis@gmail.comt>
+Description: SIR model for COVID-19 allowing for age-structure and multiple vaccines and strains.
+License: GPL-2
+Imports: deSolve, lubridate, dplyr, tidyr, plyr, foreach
+Suggests: R.rsp
+RoxygenNote: 7.1.1
+Encoding: UTF-8
+VignetteBuilder: R.rsp
